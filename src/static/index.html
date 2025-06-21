@@ -472,8 +472,10 @@
                 positionsList.innerHTML = positions.map(pos => {
                     const symbolPlain = pos.symbol.replace('/', '');
                     const priceChange24h = typeof pos.change_24h === 'number' ? pos.change_24h : 0;
+                     const currentPnl = typeof pos.current_pnl_percent === 'number' ? pos.current_pnl_percent : 0;
                     const changeClass = priceChange24h >= 0 ? 'positive' : 'negative';
                     const changeSymbol = priceChange24h >= 0 ? '↗️' : '↘️';
+                    const changeSymbolPnl = currentPnl >= 0 ? '↗️' : '↘️';
 
                     return `
                         <div class="position-card">
@@ -492,8 +494,8 @@
                             </p>
                             <p>📊 กำไร/ขาดทุน: 
                                 <span id="pnl-${pos.symbol.replace('/', '')}" 
-                                    class="pnl ${pos.current_pnl_percent >= 0 ? 'positive' : 'negative'}">
-                                    ${pos.current_pnl_percent ? pos.current_pnl_percent.toFixed(2) : '0.00'}%
+                                    class="pnl ${currentPnl >= 0 ? 'positive' : 'negative'}">
+                                    ${currentPnl ? currentPnl.toFixed(2) : '0.00'}%
                                 </span>
                             </p>
 
@@ -958,8 +960,10 @@
                     pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
                 }
 
-                // อัปเดตแสดงผล
-                pnlElement.textContent = `${pnlPercent.toFixed(2)}%`;
+                  // Add arrow symbol
+                const changeSymbolPnl = pnlPercent >= 0 ? '↗️' : '↘️';
+        
+                pnlElement.innerHTML = `${changeSymbolPnl} ${pnlPercent.toFixed(2)}%`;
                 pnlElement.className = `pnl ${pnlPercent >= 0 ? 'positive' : 'negative'}`;
                 pnlElement.classList.add('pnl-updated');
                 setTimeout(() => pnlElement.classList.remove('pnl-updated'), 1000);

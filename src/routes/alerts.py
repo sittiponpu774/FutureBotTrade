@@ -17,7 +17,7 @@ def get_all_alerts():
                 "position_id": alert.position_id,
                 "alert_type": alert.alert_type,
                 "message": alert.message,
-                "triggered_at": alert.triggered_at.isoformat(),
+                "triggered_at": alert.triggered_at,
                 "is_read": alert.is_read
             })
         return jsonify(output), 200
