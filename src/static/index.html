@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Price Predictor</title>
     <!-- Socket.IO Client Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@3.1.3/dist/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/min/moment.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    
+</head>
+
     <style>
         * {
             margin: 0;
@@ -231,7 +237,7 @@
 
         .position-header {
             display: flex;
-            justify-content: space-between;
+            /* justify-content: space-between; */
             align-items: center;
             margin-bottom: 15px;
         }
@@ -351,9 +357,25 @@
                 font-size: 2em;
             }
         }
+        .position-card .w-100 {
+            min-height: 220px;
+            height: 220px;
+            max-width: 100%;
+        }
+        .position-card canvas {
+            width: 100% !important;
+            height: 220px !important;
+            max-width: 100%;
+            display: block;
+        }
+        .tv-lightweight-charts, .tv-lightweight-charts * {
+            color: #ffffff !important;
+            font-size: 13px !important;
+        }
     </style>
 </head>
 <body>
+
     <div class="container">
         <h1>🚀 Crypto Price Predictor</h1>
         
@@ -462,9 +484,12 @@
     </div>
 
     <script>
+
         let currentPrediction = null;
         let positions = [];
         let unreadAlertCount = 0;
+        const charts = {};
+        const candleData = {}; // เพิ่มไว้บนสุดของ script
 
         function showTab(tabName) {
             // Hide all tabs
@@ -480,9 +505,10 @@
             event.target.classList.add('active');
 
             // Load data for specific tabs
-            if (tabName === 'positions') {
-                // loadPositions();
-            } else if (tabName === 'alerts') {
+            // if (tabName === 'positions') {
+            //     // loadPositions();
+            // } else 
+            if (tabName === 'alerts') {
                 loadAlerts();
                 // Clear unread count when viewing alerts
                 unreadAlertCount = 0;
@@ -495,6 +521,11 @@
         }
 
         async function createPosition() {
+            const chartId = `chart-${currentPrediction.symbol.replace('/', '')}-${currentPrediction.timeframe}`;
+            if (document.getElementById(chartId) && charts[`${currentPrediction.symbol.replace('/', '')}-${currentPrediction.timeframe}`]) {
+                showError('มีกราฟสำหรับเหรียญและ Timeframe นี้อยู่แล้ว ไม่สามารถสร้างซ้ำได้');
+                return;
+            }
             const entryPrice = document.getElementById('entryPrice').value;
             const profitTarget = document.getElementById('profitTarget').value;
             const lossLimit = document.getElementById('lossLimit').value;
@@ -536,6 +567,23 @@
             }
         }
 
+        async function deletePosition(positionId) {
+            if (!confirm('คุณแน่ใจหรือไม่ที่จะลบ Position นี้?')) return;
+            try {
+                const response = await fetch(`/api/positions/${positionId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'เกิดข้อผิดพลาดในการลบ Position');
+                }
+                showSuccess('ลบ Position สำเร็จ');
+                loadPositions(); // reload list
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
         async function loadPositions() {
             try {
                 const response = await fetch('/api/positions');
@@ -550,40 +598,54 @@
               
                 positionsList.innerHTML = positions.map(pos => {
                     const symbolPlain = pos.symbol.replace('/', '');
+                    const tf = pos.timeframe;
                     const priceChange24h = typeof pos.change_24h === 'number' ? pos.change_24h : 0;
                     const currentPnl = typeof pos.current_pnl_percent === 'number' ? pos.current_pnl_percent : 0;
                     const changeClass = priceChange24h >= 0 ? 'positive' : 'negative';
                     const changeSymbol = priceChange24h >= 0 ? '↗️' : '↘️';
                     const changeSymbolPnl = currentPnl >= 0 ? '↗️' : '↘️';
-
+                    const chartId = `chart-${symbolPlain}-${tf}`;
+                   
                     return `
-                        <div class="position-card">
-                            <div class="position-header">
-                                <h4>${pos.symbol} (${pos.timeframe})</h4>
-                                <span class="position-type ${pos.position_type.toLowerCase()}">${pos.position_type}</span>
-                            </div>
-                            <p>📅 เวลาเข้า: ${new Date(pos.entry_time).toLocaleString('th-TH')}</p>
-                            <p>💰 ราคาเข้า: ${pos.entry_price} USDT</p>
-                            <p>📈 ราคาปัจจุบัน: 
-                                <span id="price-${symbolPlain}" class="real-time-price">${pos.current_price || 'N/A'}</span> USDT
-                                <span id="change-${symbolPlain}" class="change-24h ${changeClass}">
+                    <div class="position-card mb-4" id="position-card-${pos.id}">
+                        <div class="row g-0 align-items-center">
+                            <div class="col-md-6 col-12">
+                                <div class="position-header d-flex align-items-center mb-2">
+                                    <h4 class="mb-0">${pos.symbol} (${pos.timeframe})</h4>&nbsp;
+                                    <span class="position-type ${pos.position_type.toLowerCase()}">${pos.position_type}</span>
+                                </div>
+                                <!-- เพิ่มปุ่มลบตรงนี้ -->
+                              
+                                <p>📅 เวลาเข้า: ${new Date(pos.entry_time).toLocaleString('th-TH')}</p>
+                                <p>💰 ราคาเข้า: ${pos.entry_price} USDT</p>
+                                <p>📈 ราคาปัจจุบัน: 
+                                    <span id="price-${symbolPlain}" class="real-time-price">${pos.current_price || 'N/A'}</span> USDT
+                                    <span id="change-${symbolPlain}" class="change-24h ${priceChange24h >= 0 ? 'positive' : 'negative'}">
                                     ${changeSymbol} ${priceChange24h.toFixed(2)}%
-                                </span>
-                            </p>
-                            <p>📊 กำไร/ขาดทุน: 
-                                <span id="pnl-${pos.symbol.replace('/', '')}" 
-                                    class="pnl ${currentPnl >= 0 ? 'positive' : 'negative'}">
+                                    </span>
+                                </p>
+                                <p>📊 กำไร/ขาดทุน: 
+                                    <span id="pnl-${symbolPlain}" class="pnl ${currentPnl >= 0 ? 'positive' : 'negative'}">
                                     ${changeSymbolPnl} ${currentPnl ? currentPnl.toFixed(2) : '0.00'}%
-                                </span>
-                            </p>
-                            <p>🎯 เป้าหมายกำไร: ${pos.profit_target}%</p>
-                            <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
+                                    </span>
+                                </p>
+                                <p>🎯 เป้าหมายกำไร: ${pos.profit_target}%</p>
+                                <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
+                                <button class="btn btn-danger btn-sm mb-2" onclick="deletePosition(${pos.id})">🗑️ ลบ Position นี้</button>
+                            </div>
+                            <div class="col-md-6 col-12 d-flex align-items-center justify-content-center">
+                                <div class="w-100">
+                                    <div id="${chartId}" class="w-100" style="max-width:100%; min-width:180px; min-height:180px; height:220px;"></div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
                     `;
                 }).join('');
 
-                // *** ลบ checkPositionsForAlerts(); ออก ***
-                // loadAlerts(); // อาจคงไว้ถ้าต้องการ refresh alerts
+                positions.forEach(pos => {
+                    renderPriceChart(pos.symbol.replace('/', ''), pos.timeframe);
+                });
 
             } catch (err) {
                 showError('เกิดข้อผิดพลาดในการโหลด Positions: ' + err.message);
@@ -617,6 +679,7 @@
                 showError('เกิดข้อผิดพลาดในการโหลดการแจ้งเตือน: ' + err.message);
             }
         }
+        
 
         // New function to check positions and trigger alerts automatically
         function checkPositionsForAlerts() {
@@ -780,6 +843,79 @@
             }
         }
 
+        // ...โค้ดทั้งหมดของคุณ...
+        async function renderPriceChart(symbol, timeframe) {
+            const res = await fetch(`/api/price-history?symbol=${symbol}&timeframe=${timeframe}`);
+            const data = await res.json();
+            const chartDiv = document.getElementById(`chart-${symbol}-${timeframe}`);
+            if (!chartDiv) return;
+            // ใช้ key รวม symbol+timeframe
+            const chartKey = `${symbol}-${timeframe}`;
+            if (charts[chartKey]) {
+                charts[chartKey].remove();
+            }
+            const width = chartDiv.offsetWidth || 300;
+            const chart = LightweightCharts.createChart(chartDiv, {
+                height: 220,
+                width: width,
+                layout: {
+                    background: { color: '#fff' },
+                    textColor: '#222'
+                },
+                grid: {
+                    vertLines: { color: '#eee' },
+                    horzLines: { color: '#eee' }
+                },
+                timeScale: {
+                    timeVisible: true,
+                    secondsVisible: true,
+                    borderColor: '#ccc',
+                    textColor: '#222'
+                },
+                crosshair: {
+                    vertLine: {
+                        color: '#667eea',
+                        width: 1,
+                        style: LightweightCharts.LineStyle.Solid,
+                        labelBackgroundColor: '#000'
+                    },
+                    horzLine: {
+                        color: '#667eea',
+                        width: 1,
+                        style: LightweightCharts.LineStyle.Solid,
+                        labelBackgroundColor: '#000'
+                    },
+                    mode: LightweightCharts.CrosshairMode.Normal
+                }
+            });
+            const candleSeries = chart.addCandlestickSeries({
+                priceFormat: { type: 'price', precision: 5, minMove: 0.00001 }
+            });
+            // ใช้ key รวม symbol+timeframe
+            candleData[chartKey] = data.map(d => ({
+                time: Math.floor(d.timestamp / 1000),
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close
+            }));
+            candleSeries.setData(candleData[chartKey]);
+            chart.timeScale().fitContent();
+            chart._candleSeries = candleSeries;
+            charts[chartKey] = chart;
+        }
+
+        // ให้ chart resize ตาม div เมื่อหน้าต่างเปลี่ยนขนาด
+        window.addEventListener('resize', () => {
+            Object.entries(charts).forEach(([symbol, chart]) => {
+                const chartDiv = document.getElementById(`chart-${symbol}`);
+                if (chartDiv) {
+                    chart.resize(chartDiv.offsetWidth, 220);
+                }
+            });
+        });
+
+
         function showError(message) {
             const error = document.getElementById('error');
             error.textContent = message;
@@ -900,13 +1036,111 @@
             });
 
             socket.on('price_update', function(data) {
-                // console.log('💰 Price update received:', data);
+                
                 updatePriceDisplay(data.data);
+                // const symbol = data.data.symbol.replace('/', '');
+                // if (charts[symbol]) {
+                //     const chart = charts[symbol];
+                //     if (chart._candleSeries) {
+                //         if (!candleData[symbol]) candleData[symbol] = [];
+                //         const ts = Number(data.data.timestamp);
+                //         const open = data.data.open;
+                //         const high = data.data.high;
+                //         const low = data.data.low;
+                //         const close = data.data.price;
+
+                //         if (
+                //             !ts || isNaN(ts) ||
+                //             typeof open !== 'number' || isNaN(open) ||
+                //             typeof high !== 'number' || isNaN(high) ||
+                //             typeof low !== 'number' || isNaN(low) ||
+                //             typeof close !== 'number' || isNaN(close)
+                //         ) {
+                //             return;
+                //         }
+
+                //         const newCandle = {
+                //             time: Math.floor(ts / 1000),
+                //             open: open,
+                //             high: high,
+                //             low: low,
+                //             close: close
+                //         };
+
+                //         const lastCandle = candleData[symbol][candleData[symbol].length - 1];
+                //         if (lastCandle && lastCandle.time === newCandle.time) {
+                //             // อัปเดตแท่งล่าสุด
+                //             candleData[symbol][candleData[symbol].length - 1] = newCandle;
+                //             chart._candleSeries.update(newCandle);
+                //         } else {
+                //             // เพิ่มแท่งใหม่
+                //             candleData[symbol].push(newCandle);
+                //             if (candleData[symbol].length > 200) {
+                //                 candleData[symbol].shift();
+                //             }
+                //             chart._candleSeries.update(newCandle);
+                //         }
+                //         chart.timeScale().scrollToRealTime();
+                //     }
+                // }
+            });
+            
+            socket.on('candle_update', function(data) {
+                // console.log('Candle update received:', data);
+                const symbol = data.data.symbol.replace('/', '');
+                if (charts[symbol]) {
+                    const chart = charts[symbol];
+                    if (chart._candleSeries) {
+                        if (!candleData[symbol]) candleData[symbol] = [];
+                        const ts = Number(data.data.timestamp);
+                        const open = data.data.open;
+                        const high = data.data.high;
+                        const low = data.data.low;
+                        const close = data.data.close;
+
+                        // ตรวจสอบข้อมูลก่อน push
+                        if (
+                            !ts || isNaN(ts) ||
+                            typeof open !== 'number' || isNaN(open) ||
+                            typeof high !== 'number' || isNaN(high) ||
+                            typeof low !== 'number' || isNaN(low) ||
+                            typeof close !== 'number' || isNaN(close)
+                        ) {
+                            return;
+                        }
+
+                        const newCandle = {
+                            time: Math.floor(ts), // ถ้า backend ส่งวินาทีอยู่แล้ว ไม่ต้อง /1000
+                            open: open,
+                            high: high,
+                            low: low,
+                            close: close
+                        };
+
+                        const lastCandle = candleData[symbol][candleData[symbol].length - 1];
+                        if (lastCandle && lastCandle.time === newCandle.time) {
+                            // อัปเดตแท่งล่าสุด
+                            candleData[symbol][candleData[symbol].length - 1] = newCandle;
+                            chart._candleSeries.update(newCandle);
+                        } else {
+                            // เพิ่มแท่งใหม่
+                            candleData[symbol].push(newCandle);
+                            if (candleData[symbol].length > 200) {
+                                candleData[symbol].shift();
+                            }
+                            chart._candleSeries.update(newCandle);
+                        }
+                        chart.timeScale().scrollToRealTime();
+                    }
+                }
             });
 
             socket.on('position_update', function(data) {
                 updatePositionDisplay(data.data);
             });
+
+            // ...ในฟังก์ชัน initWebSocket() เพิ่ม listener นี้...
+
 
             socket.on('alert', function(data) {
                 showRealtimeAlert(data.data);
@@ -1223,6 +1457,12 @@
             });
         });
 
+        document.getElementById('timeframe').addEventListener('change', function() {
+            const symbol = document.getElementById('symbol').value.replace('/', '');
+            const timeframe = this.value;
+            renderPriceChart(symbol, timeframe);
+        });
+
         // Subscribe to symbol when prediction is made
         function subscribeToCurrentSymbol() {
             // const symbolSelect = document.getElementById('symbol');
@@ -1240,8 +1480,8 @@
             localStorage.setItem('subscribedSymbols', JSON.stringify([...connectedSymbols]));
             socket.emit('unsubscribe_symbol', { symbol });
         }
-
-
+                
+   
         // Add CSS for animations
         const style = document.createElement('style');
         style.textContent = `
@@ -1295,6 +1535,11 @@
             }
         `;
         document.head.appendChild(style);
+
+
+
+        
+        
 
     </script>
 </body>

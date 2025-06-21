@@ -1,6 +1,7 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+import ccxt
 import websocket
 import json
 import threading
@@ -104,11 +105,18 @@ class BinanceWebSocketClient:
                 
                 # Broadcast via SocketIO
                 if self.socketio:
-                    # self.socketio.emit('price_update', {
-                    #     'type': 'binance_price',
-                    #     'data': price_data
-                    # })
-                    broadcast_price_update(self.socketio, symbol, price_data)
+                    # ส่งราคาปัจจุบัน
+                    self.socketio.emit('price_update', {
+                        'type': 'price_update',
+                        'data': price_data
+                    }, room=f"symbol_{symbol}")
+
+                    # ส่งแท่งเทียน
+                    candle_data = get_latest_candle(symbol, timeframe="1m")
+                    self.socketio.emit('candle_update', {
+                        'type': 'candle_update',
+                        'data': candle_data
+                    }, room=f"symbol_{symbol}")
                 
                 logger.debug(f"Price update: {symbol} = {price}")
                 
@@ -224,3 +232,21 @@ def get_binance_ws_client(socketio=None):
 if __name__ == "__main__":
     from src.websocket.websocket_server import broadcast_price_update
     print("✅ Import OK")
+
+def get_latest_candle(symbol, timeframe="1m"):
+    exchange = ccxt.binance()
+    # Binance ใช้รูปแบบ BTC/USDT
+    if not "/" in symbol:
+        symbol_ccxt = symbol.replace("USDT", "/USDT")
+    else:
+        symbol_ccxt = symbol
+    ohlcv = exchange.fetch_ohlcv(symbol_ccxt, timeframe=timeframe, limit=1)
+    ts, open_, high, low, close, vol = ohlcv[0]
+    return {
+        'symbol': symbol,
+        'open': open_,
+        'high': high,
+        'low': low,
+        'close': close,
+        'timestamp': int(ts // 1000)
+    }

@@ -167,22 +167,46 @@ def init_websocket(socketio):
             emit('error', {'message': 'Failed to get alerts'})
 
 def broadcast_price_update(socketio, symbol, price_data):
-    """Broadcast price update to subscribed clients"""
+    """Broadcast price and candle update to subscribed clients"""
     try:
-        message = {
+        # --- ส่งราคาปัจจุบัน ---
+        price_message = {
             'type': 'price_update',
             'data': {
                 'symbol': symbol,
                 'price': price_data.get('price'),
                 'change_24h': price_data.get('change_24h', 0),
-                'timestamp': price_data.get('timestamp')
+                'timestamp': price_data.get('tick_timestamp') or price_data.get('timestamp')
             }
         }
-        
-        # Broadcast to all clients subscribed to this symbol
-        socketio.emit('price_update', message, room=f"symbol_{symbol}")
-        logger.debug(f"Broadcasted price update for {symbol}: {price_data.get('price')}")
-        
+        socketio.emit('price_update', price_message, room=f"symbol_{symbol}")
+
+        # --- ส่งแท่งเทียน ---
+        # แปลง timestamp เป็นวินาที (int)
+        ts = price_data.get('timestamp')
+        if isinstance(ts, str):
+            try:
+                dt = datetime.fromisoformat(ts)
+            except ValueError:
+                dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
+            ts = int(dt.timestamp())
+        else:
+            ts = int(ts)
+        candle_message = {
+            'type': 'candle_update',
+            'data': {
+                'symbol': symbol,
+                'open': price_data.get('open'),
+                'high': price_data.get('high'),
+                'low': price_data.get('low'),
+                'close': price_data.get('close'),
+                'timestamp': ts
+            }
+        }
+        socketio.emit('candle_update', candle_message, room=f"symbol_{symbol}")
+
+        logger.debug(f"Broadcasted price and candle update for {symbol}")
+
     except Exception as e:
         logger.error(f"Error broadcasting price update: {str(e)}")
 

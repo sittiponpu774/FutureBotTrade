@@ -122,4 +122,54 @@ def clear_all_positions():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+@trading_bp.route("/price-history", methods=["GET"])
+@cross_origin()
+def price_history():
+    """
+    ตัวอย่าง: /api/price-history?symbol=DOGEUSDT&limit=50&timeframe=1m
+    """
+    try:
+        symbol = request.args.get("symbol")
+        limit = int(request.args.get("limit", 50))
+        timeframe = request.args.get("timeframe")
+
+        if not symbol:
+            return jsonify({"error": "Missing symbol"}), 400
+
+        exchange = ccxt.binance()
+        if "/" not in symbol:
+            symbol_ccxt = symbol.replace("USDT", "/USDT")
+        else:
+            symbol_ccxt = symbol
+
+        ohlcv = exchange.fetch_ohlcv(symbol_ccxt, timeframe=timeframe, limit=limit)
+        result = [
+            {
+                "timestamp": ts,
+                "open": open_,
+                "high": high,
+                "low": low,
+                "close": close
+            }
+            for ts, open_, high, low, close, vol in ohlcv
+        ]
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@trading_bp.route("/positions/<int:position_id>", methods=["DELETE"])
+@cross_origin()
+def delete_position(position_id):
+    """ลบ Position รายตัวตาม id"""
+    try:
+        pos = Position.query.get(position_id)
+        if not pos:
+            return jsonify({"error": "ไม่พบ Position นี้"}), 404
+        db.session.delete(pos)
+        db.session.commit()
+        return jsonify({"success": True, "message": f"ลบ Position {position_id} เรียบร้อยแล้ว"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
