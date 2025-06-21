@@ -6,262 +6,352 @@
     <title>Crypto Price Predictor</title>
     <!-- Socket.IO Client Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <!-- <script src="socket.io.min.js"></script> -->
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            padding: 20px;
         }
-        .container { 
-            background-color: #fff; 
-            padding: 30px; 
-            border-radius: 15px; 
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); 
-            max-width: 800px; 
-            margin: auto;
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
-        h1 { 
-            text-align: center; 
-            color: #333; 
+
+        h1 {
+            text-align: center;
+            color: #333;
             margin-bottom: 30px;
             font-size: 2.5em;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .tabs {
             display: flex;
+            justify-content: center;
             margin-bottom: 30px;
-            border-bottom: 2px solid #e0e0e0;
+            gap: 10px;
         }
+
         .tab {
-            padding: 15px 25px;
-            cursor: pointer;
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
             border: none;
-            background: none;
+            border-radius: 25px;
+            cursor: pointer;
             font-size: 16px;
-            font-weight: bold;
-            color: #666;
-            transition: color 0.3s ease, border-bottom 0.3s ease;
-            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            transform: translateY(0);
         }
+
+        .tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
         .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
+
         .tab-content {
             display: none;
+            animation: fadeIn 0.5s ease-in;
         }
+
         .tab-content.active {
             display: block;
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
-        label { 
-            display: block; 
-            margin-bottom: 8px; 
-            font-weight: bold; 
-            color: #555;
-            font-size: 1.1em;
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
         }
-        input[type="text"], select, input[type="number"] { 
-            width: 100%; 
-            padding: 15px; 
-            margin-bottom: 10px; 
-            border: 2px solid #e0e0e0; 
-            border-radius: 8px; 
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
             font-size: 16px;
-            transition: border-color 0.3s ease;
-            box-sizing: border-box;
+            transition: all 0.3s ease;
         }
-        input[type="text"]:focus, select:focus, input[type="number"]:focus {
+
+        input:focus, select:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-        button { 
+
+        .popular-coins {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .coin-tag {
+            padding: 8px 16px;
             background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white; 
-            padding: 15px 30px; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            width: 100%; 
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .coin-tag:hover {
+            transform: scale(1.05);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
             font-size: 18px;
-            font-weight: bold;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
-        button:hover { 
+
+        button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
-        button:active {
-            transform: translateY(0);
-        }
+
         button:disabled {
-            background: #ccc;
+            opacity: 0.6;
             cursor: not-allowed;
             transform: none;
-            box-shadow: none;
         }
-        .result { 
-            margin-top: 30px; 
-            padding: 20px; 
-            border: 2px solid #e0e0e0; 
-            border-radius: 10px; 
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            text-align: center;
-            display: none;
-        }
-        .result p { 
-            margin: 10px 0; 
-            font-size: 1.1em;
-        }
-        .long { 
-            color: #28a745; 
-            font-weight: bold; 
-            font-size: 1.3em;
-        }
-        .short { 
-            color: #dc3545; 
-            font-weight: bold; 
-            font-size: 1.3em;
-        }
+
         .loading {
             display: none;
             text-align: center;
-            margin-top: 20px;
+            padding: 40px;
         }
+
         .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
+            margin: 0 auto 20px;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            padding: 15px;
-            border-radius: 8px;
+
+        .result, .error, .success {
             margin-top: 20px;
-            display: none;
-        }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            display: none;
-        }
-        .popular-coins {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .coin-tag {
-            background-color: #e9ecef;
-            padding: 5px 10px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: background-color 0.2s ease;
-        }
-        .coin-tag:hover {
-            background-color: #667eea;
-            color: white;
-        }
-        .position-card {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .position-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .position-type {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-weight: bold;
-            font-size: 0.9em;
-        }
-        .position-type.long {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .position-type.short {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .pnl {
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        .pnl.positive {
-            color: #28a745;
-        }
-        .pnl.negative {
-            color: #dc3545;
-        }
-        .alert-item {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-        }
-        .alert-item.reversal {
-            background: #d1ecf1;
-            border-color: #bee5eb;
-        }
-        .alert-item.profit {
-            background: #d4edda;
-            border-color: #c3e6cb;
-        }
-        .alert-item.loss {
-            background: #f8d7da;
-            border-color: #f5c6cb;
-        }
-        .create-position-section {
-            background: #e7f3ff;
-            border: 2px solid #b3d9ff;
-            border-radius: 10px;
             padding: 20px;
-            margin-top: 20px;
+            border-radius: 10px;
+            display: none;
         }
+
+        .result {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            border-left: 5px solid #28a745;
+        }
+
+        .error {
+            background: linear-gradient(135deg, #fce8e8, #fff0f0);
+            border-left: 5px solid #dc3545;
+            color: #721c24;
+        }
+
+        .success {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            border-left: 5px solid #28a745;
+            color: #155724;
+        }
+
         .two-column {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: 20px;
         }
-        @media (max-width: 600px) {
+
+        .create-position-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            border: 2px dashed #667eea;
+        }
+
+        .position-card, .alert-item {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .position-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .position-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .position-type.long {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .position-type.short {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .long {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .short {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .pnl.positive,
+        .change-24h.positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .pnl.negative,
+        .change-24h.negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .alert-item.profit_target {
+            border-left-color: #28a745;
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+        }
+
+        .alert-item.stop_loss {
+            border-left-color: #dc3545;
+            background: linear-gradient(135deg, #fce8e8, #fff0f0);
+        }
+
+        .alert-item.reversal {
+            border-left-color: #17a2b8;
+            background: linear-gradient(135deg, #e8f6f8, #f0f9fa);
+        }
+
+        .real-time-price {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .price-updated {
+            transition: background-color 0.3s ease;
+            background-color: #ffeaa7;
+        }
+
+        .pnl-updated {
+            animation: flashUpdate 0.3s ease;
+        }
+
+        @keyframes flashUpdate {
+            from { background-color: #ffeaa7; }
+            to { background-color: transparent; }
+        }
+
+        @keyframes blink {
+            0% { background-color: yellow; }
+            100% { background-color: transparent; }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .tabs {
+                flex-direction: column;
+                gap: 10px;
+            }
+
             .two-column {
                 grid-template-columns: 1fr;
             }
+
+            h1 {
+                font-size: 2em;
+            }
         }
     </style>
-  
 </head>
 <body>
     <div class="container">
@@ -270,7 +360,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('predict')">📊 ทำนายราคา</button>
             <button class="tab" onclick="showTab('positions')">💼 จัดการ Positions</button>
-            <button class="tab" onclick="showTab('alerts')">🔔 การแจ้งเตือน</button>
+            <button class="tab" onclick="showTab('alerts')">🔔 การแจ้งเตือน <span id="alertBadge" class="alert-badge" style="display: none;"></span></button>
         </div>
 
         <!-- Tab 1: Prediction -->
@@ -344,9 +434,6 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3>💼 Positions ที่กำลังติดตาม</h3>
                 <div>
-                    <!-- <button onclick="loadPositions()" style="background: linear-gradient(45deg, #28a745, #20c997); width: auto; padding: 10px 20px; font-size: 14px; margin-right: 10px;">
-                        🔄 รีเฟรช
-                    </button> -->
                     <button onclick="clearAllPositions()" style="background: linear-gradient(45deg, #dc3545, #c82333); width: auto; padding: 10px 20px; font-size: 14px;">
                         🗑️ เคลียร์ทั้งหมด
                     </button>
@@ -376,6 +463,8 @@
 
     <script>
         let currentPrediction = null;
+        let positions = [];
+        let unreadAlertCount = 0;
 
         function showTab(tabName) {
             // Hide all tabs
@@ -395,6 +484,9 @@
                 loadPositions();
             } else if (tabName === 'alerts') {
                 loadAlerts();
+                // Clear unread count when viewing alerts
+                unreadAlertCount = 0;
+                updateAlertBadge();
             }
         }
 
@@ -436,6 +528,9 @@
 
                 showSuccess('สร้าง Position สำเร็จ! ID: ' + data.position_id);
                 
+                // Reload positions to show the new one
+                loadPositions();
+                
             } catch (err) {
                 showError(err.message);
             }
@@ -444,7 +539,7 @@
         async function loadPositions() {
             try {
                 const response = await fetch('/api/positions');
-                const positions = await response.json();
+                positions = await response.json();
 
                 const positionsList = document.getElementById('positionsList');
                 
@@ -452,27 +547,11 @@
                     positionsList.innerHTML = '<p>ไม่มี Position ที่กำลังติดตาม</p>';
                     return;
                 }
-                // console.log('🔍 Positions loaded:', positions);
-                // positionsList.innerHTML = positions.map(pos => `
-                //     <div class="position-card">
-                //         <div class="position-header">
-                //             <h4>${pos.symbol} (${pos.timeframe})</h4>
-                //             <span class="position-type ${pos.position_type.toLowerCase()}">${pos.position_type}</span>
-                //         </div>
-                //         <p>📅 เวลาเข้า: ${new Date(pos.entry_time).toLocaleString('th-TH')}</p>
-                //         <p>💰 ราคาเข้า: ${pos.entry_price} USDT</p>
-                //         <p>📈 ราคาปัจจุบัน: <span id="price-${pos.symbol.replace('/','')}" class="real-time-price">${pos.current_price || 'N/A'}</span> USDT</p>
-                //         <p>📊 กำไร/ขาดทุน: <span id="pnl-${pos.id}" class="pnl ${pos.current_pnl_percent >= 0 ? 'positive' : 'negative'}">${pos.current_pnl_percent ? pos.current_pnl_percent.toFixed(2) : '0.00'}%</span></p>
-                //         <p>🎯 เป้าหมายกำไร: ${pos.profit_target}%</p>
-                //         <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
-                //         <p>📊 สถานะ: ${pos.status}</p>
-                //         ${pos.status === 'ACTIVE' ? `<button onclick="closePosition(${pos.id})">❌ ปิด Position</button>` : ''}
-                //     </div>
-                // `).join('');
+              
                 positionsList.innerHTML = positions.map(pos => {
                     const symbolPlain = pos.symbol.replace('/', '');
                     const priceChange24h = typeof pos.change_24h === 'number' ? pos.change_24h : 0;
-                     const currentPnl = typeof pos.current_pnl_percent === 'number' ? pos.current_pnl_percent : 0;
+                    const currentPnl = typeof pos.current_pnl_percent === 'number' ? pos.current_pnl_percent : 0;
                     const changeClass = priceChange24h >= 0 ? 'positive' : 'negative';
                     const changeSymbol = priceChange24h >= 0 ? '↗️' : '↘️';
                     const changeSymbolPnl = currentPnl >= 0 ? '↗️' : '↘️';
@@ -490,46 +569,24 @@
                                 <span id="change-${symbolPlain}" class="change-24h ${changeClass}">
                                     ${changeSymbol} ${priceChange24h.toFixed(2)}%
                                 </span>
-
                             </p>
                             <p>📊 กำไร/ขาดทุน: 
                                 <span id="pnl-${pos.symbol.replace('/', '')}" 
                                     class="pnl ${currentPnl >= 0 ? 'positive' : 'negative'}">
-                                    ${currentPnl ? currentPnl.toFixed(2) : '0.00'}%
+                                    ${changeSymbolPnl} ${currentPnl ? currentPnl.toFixed(2) : '0.00'}%
                                 </span>
                             </p>
-
                             <p>🎯 เป้าหมายกำไร: ${pos.profit_target}%</p>
                             <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
-                            <p>📊 สถานะ: ${pos.status}</p>
-                            ${pos.status === 'ACTIVE' ? `<button onclick="closePosition(${pos.id})">❌ ปิด Position</button>` : ''}
                         </div>
                     `;
                 }).join('');
 
+                // *** ลบ checkPositionsForAlerts(); ออก ***
+                // loadAlerts(); // อาจคงไว้ถ้าต้องการ refresh alerts
 
             } catch (err) {
                 showError('เกิดข้อผิดพลาดในการโหลด Positions: ' + err.message);
-            }
-        }
-
-        async function closePosition(positionId) {
-            try {
-                const response = await fetch(`/api/position/${positionId}/close`, {
-                    method: 'PUT'
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'เกิดข้อผิดพลาดในการปิด Position');
-                }
-
-                showSuccess('ปิด Position สำเร็จ!');
-                loadPositions(); // Reload positions
-
-            } catch (err) {
-                showError(err.message);
             }
         }
 
@@ -558,6 +615,100 @@
 
             } catch (err) {
                 showError('เกิดข้อผิดพลาดในการโหลดการแจ้งเตือน: ' + err.message);
+            }
+        }
+
+        // New function to check positions and trigger alerts automatically
+        function checkPositionsForAlerts() {
+            if (!positions || positions.length === 0) return;
+
+            positions.forEach(pos => {
+                const currentPnl = typeof pos.current_pnl_percent === 'number' ? pos.current_pnl_percent : 0;
+                const profitTarget = typeof pos.profit_target === 'number' ? pos.profit_target : 0;
+                const lossLimit = typeof pos.loss_limit === 'number' ? pos.loss_limit : 0;
+
+                // กำไร: เท่ากับหรือมากกว่าเป้าหมาย
+                if (!pos.profit_alert_triggered && currentPnl >= profitTarget) {
+                    triggerProfitAlert(pos, currentPnl);
+                    pos.profit_alert_triggered = true;
+                }
+                // ขาดทุน: เท่ากับหรือน้อยกว่าขีดจำกัด (ถ้า loss_limit เป็นบวก ให้เช็ค currentPnl <= -lossLimit)
+                if (!pos.loss_alert_triggered && currentPnl <= -Math.abs(lossLimit)) {
+                    triggerLossAlert(pos, currentPnl);
+                    pos.loss_alert_triggered = true;
+                }
+            });
+        }
+
+        function triggerProfitAlert(position, pnl) {
+            const alertData = {
+                alert_type: 'PROFIT_TARGET',
+                message: `🎉 Position ${position.symbol} ถึงเป้าหมายกำไรแล้ว! กำไร: ${pnl.toFixed(2)}% (เป้าหมาย: ${position.profit_target}%)`,
+                timestamp: new Date().toISOString(),
+                position_id: position.id
+            };
+
+            // ส่งไป backend เพื่อบันทึก alert
+            fetch('/api/alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(alertData)
+            }).then(() => {
+                // ถ้าอยู่ใน tab alerts ให้ refresh
+                if (document.getElementById('alerts-tab').classList.contains('active')) {
+                    loadAlerts();
+                }
+            });
+
+            showRealtimeAlert(alertData);
+            unreadAlertCount++;
+            updateAlertBadge();
+        }
+
+        function triggerLossAlert(position, pnl) {
+            const alertData = {
+                alert_type: 'STOP_LOSS',
+                message: `⚠️ Position ${position.symbol} ถึงขีดจำกัดขาดทุนแล้ว! ขาดทุน: ${pnl.toFixed(2)}% (ขีดจำกัด: -${position.loss_limit}%)`,
+                timestamp: new Date().toISOString(),
+                position_id: position.id
+            };
+
+            // ส่งไป backend เพื่อบันทึก alert
+            fetch('/api/alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(alertData)
+            }).then(() => {
+                if (document.getElementById('alerts-tab').classList.contains('active')) {
+                    loadAlerts();
+                }
+            });
+
+            showRealtimeAlert(alertData);
+            unreadAlertCount++;
+            updateAlertBadge();
+        }
+
+        function updateAlertBadge() {
+            const badge = document.getElementById('alertBadge');
+            if (unreadAlertCount > 0) {
+                badge.textContent = unreadAlertCount;
+                badge.style.display = 'inline-block';
+                badge.style.cssText = `
+                    display: inline-block;
+                    background: #dc3545;
+                    color: white;
+                    border-radius: 50%;
+                    width: 20px;
+                    height: 20px;
+                    font-size: 12px;
+                    text-align: center;
+                    line-height: 20px;
+                    margin-left: 5px;
+                    animation: pulse 1s infinite;
+                `;
+            } else {
+                badge.style.display = 'none';
             }
         }
 
@@ -824,39 +975,7 @@
             }
         }
 
-        // function updatePriceDisplay(priceData) {
-        //     const symbol = priceData.symbol;
-        //     const price = priceData.price;
-        //     const change24h = priceData.change_24h;
 
-        //     // console.log(`🟡 Updating display for ${symbol}: ${price}`);
-        //     // Update price in prediction result if it matches current symbol
-        //     const coinSymbolElement = document.getElementById('coinSymbol');
-        //     const latestPriceElement = document.getElementById('latestPrice');
-            
-        //     if (coinSymbolElement && coinSymbolElement.textContent === symbol) {
-        //         latestPriceElement.textContent = price.toFixed(6);
-                
-        //         // Add price change indicator
-        //         const changeClass = change24h >= 0 ? 'positive' : 'negative';
-        //         const changeSymbol = change24h >= 0 ? '↗️' : '↘️';
-        //         latestPriceElement.innerHTML = `${price.toFixed(6)} <span class="pnl ${changeClass}">${changeSymbol} ${change24h.toFixed(2)}%</span>`;
-        //     }
-
-        //     // Update real-time price displays in position cards
-        //     // const priceElements = document.querySelectorAll(`#price-${symbol.replace('/', '-')}`);
-        //     // console.log(`🟡 Updating display for ${symbol}: ${price}`);
-        //     const priceElements = document.querySelectorAll(`#price-${symbol}`);
-        //     // console.log('🔍 Found elements:', priceElements);
-        //     priceElements.forEach(element => {
-        //         element.textContent = price.toFixed(6);
-        //         element.classList.add('price-updated');
-        //         setTimeout(() => element.classList.remove('price-updated'), 1000);
-        //     });
-
-        //     // Update P&L for positions with this symbol
-        //     updatePositionPnL(symbol, price);
-        // }
         function updatePriceDisplay(priceData) {
             const symbol = priceData.symbol;
             const price = priceData.price;
@@ -902,43 +1021,36 @@
 
 
 
-            // 4. อัปเดต %PnL
-            updatePositionPnL(symbol, price);
+            // 4. อัปเดต %PnL ใน positions array ด้วย!
+            positions.forEach(pos => {
+                if (pos.symbol.replace('/', '') === symbol.replace('/', '')) {
+                    // คำนวณ PnL ใหม่
+                    let entryPrice = pos.entry_price;
+                    let pnlPercent = 0;
+                    if (pos.position_type === 'LONG') {
+                        pnlPercent = ((price - entryPrice) / entryPrice) * 100;
+                    } else if (pos.position_type === 'SHORT') {
+                        pnlPercent = ((entryPrice - price) / entryPrice) * 100;
+                    }
+                    pos.current_pnl_percent = pnlPercent;
+                    pos.current_price = price;
+
+                    // อัปเดต DOM ของ PnL
+                    const pnlElement = document.getElementById(`pnl-${symbol}`);
+                    if (pnlElement) {
+                        const changeSymbolPnl = pnlPercent >= 0 ? '↗️' : '↘️';
+                        pnlElement.innerHTML = `${changeSymbolPnl} ${pnlPercent.toFixed(2)}%`;
+                        pnlElement.className = `pnl ${pnlPercent >= 0 ? 'positive' : 'negative'}`;
+                        pnlElement.classList.add('pnl-updated');
+                        setTimeout(() => pnlElement.classList.remove('pnl-updated'), 1000);
+                    }
+                }
+            });
+
+            // เรียก checkPositionsForAlerts เฉพาะเพื่อเช็คและ trigger alert
+            checkPositionsForAlerts();
         }
 
-
-        // function updatePositionPnL(symbol, currentPrice) {
-        //     // Get all position cards and update P&L for matching symbols
-        //     const positionCards = document.querySelectorAll('.position-card');
-        //     positionCards.forEach(card => {
-        //         const cardSymbol = card.querySelector('h4').textContent.split(' ')[0];
-        //         if (cardSymbol === symbol) {
-        //             // Extract entry price and position type
-        //             const entryPriceText = card.querySelector('p:nth-child(3)').textContent;
-        //             const entryPrice = parseFloat(entryPriceText.match(/[\d.]+/)[0]);
-                    
-        //             const positionTypeElement = card.querySelector('.position-type');
-        //             const positionType = positionTypeElement.textContent;
-                    
-        //             // Calculate P&L percentage
-        //             let pnlPercent = 0;
-        //             if (positionType === 'LONG') {
-        //                 pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
-        //             } else if (positionType === 'SHORT') {
-        //                 pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
-        //             }
-                    
-        //             // Update P&L display
-        //             const pnlElement = card.querySelector('.pnl');
-        //             if (pnlElement) {
-        //                 pnlElement.textContent = `${pnlPercent.toFixed(2)}%`;
-        //                 pnlElement.className = `pnl ${pnlPercent >= 0 ? 'positive' : 'negative'}`;
-        //                 pnlElement.classList.add('pnl-updated');
-        //                 setTimeout(() => pnlElement.classList.remove('pnl-updated'), 1000);
-        //             }
-        //         }
-        //     });
-        // }
         function updatePositionPnL(symbol, currentPrice) {
             const pnlElement = document.getElementById(`pnl-${symbol}`);
             const entryElement = document.querySelector(`#price-${symbol}`); // ถ้ามี entry price แสดง
@@ -1103,7 +1215,7 @@
         // Initialize WebSocket when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initWebSocket();
-
+            loadPositions();
           // 🧠 โหลด symbol ที่เคย subscribe กลับมา
             const savedSymbols = JSON.parse(localStorage.getItem('subscribedSymbols') || '[]');
             savedSymbols.forEach(symbol => {
@@ -1184,22 +1296,11 @@
         `;
         document.head.appendChild(style);
 
-             
-        // Add CSS for animations and price updates
-      
-
-            // Initialize WebSocket when page loads
-        // document.addEventListener('DOMContentLoaded', function() {
-        //     initWebSocket();
-        //     // 👇 subscribe symbol ที่ต้องการทันทีหลังเปิดหน้า
-        //     const defaultSymbol = document.getElementById('symbol')?.value || 'BTCUSDT';
-        //     subscribeToSymbol(defaultSymbol);
-        // });
     </script>
 </body>
 </html>
 
-    
-  
+
+
 
 

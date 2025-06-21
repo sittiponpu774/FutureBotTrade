@@ -83,23 +83,7 @@ def get_positions():
         return jsonify({"error": str(e)}), 500
 
 
-@trading_bp.route("/position/<int:position_id>/close", methods=["PUT"])
-@cross_origin()
-def close_position(position_id):
-    try:
-        position = Position.query.get(position_id)
-        if not position:
-            return jsonify({"error": "Position not found"}), 404
 
-        position.status = "CLOSED"
-        position.updated_at = datetime.utcnow()
-        db.session.commit()
-
-        return jsonify({"message": f"Position {position_id} closed successfully"}), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
 
 @trading_bp.route("/position/<int:position_id>/alerts", methods=["GET"])
 @cross_origin()

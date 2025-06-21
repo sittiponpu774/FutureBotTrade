@@ -110,18 +110,10 @@ class PositionMonitoringService:
                 self._create_alert(position, 'PROFIT_TARGET', 
                                  f"Position {position.symbol} reached profit target of {position.profit_target}%")
                 
-                # Close position automatically
-                position.status = 'closed'
-                position.closed_at = datetime.now()
-                
             # Check stop loss
             elif current_pnl_percentage <= -position.stop_loss:
                 self._create_alert(position, 'STOP_LOSS', 
                                  f"Position {position.symbol} hit stop loss at -{position.stop_loss}%")
-                
-                # Close position automatically
-                position.status = 'closed'
-                position.closed_at = datetime.now()
                 
         except Exception as e:
             logger.error(f"Error checking alerts for position {position.id}: {str(e)}")
