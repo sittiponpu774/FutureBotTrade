@@ -4,25 +4,27 @@ from src.models.user import db
 from src.models.trading import Position, Alert, SignalHistory
 from datetime import datetime
 import ccxt
+from src.utils.binance_websocket import get_binance_ws_client
 
 trading_bp = Blueprint("trading", __name__)
 
 @trading_bp.route("/track-position", methods=["POST"])
 @cross_origin()
 def track_position():
+    print(f"[DEBUG] 🧪 เช็ค position: ")
     try:
         data = request.get_json()
         symbol = data.get("symbol")
         timeframe = data.get("timeframe")
         position_type = data.get("position_type")
         entry_price = data.get("entry_price")
-        profit_target = data.get("profit_target", 2.0)  # Default to 2%
-        loss_limit = data.get("loss_limit", 1.0)  # Default to
-        
+        profit_target = data.get("profit_target", 2.0)
+        loss_limit = data.get("loss_limit", 1.0)
 
         if not all([symbol, timeframe, position_type, entry_price, profit_target, loss_limit]):
             return jsonify({"error": "Missing data for tracking position"}), 400
 
+        # ✅ 1. บันทึกลงฐานข้อมูล
         new_position = Position(
             symbol=symbol,
             timeframe=timeframe,
@@ -35,7 +37,15 @@ def track_position():
         db.session.add(new_position)
         db.session.commit()
 
-        return jsonify({"message": "Position tracked successfully", "position_id": new_position.id}), 201
+        
+        # ✅ 2. Subscribe WebSocket ด้วย symbol + timeframe
+        binance_client = get_binance_ws_client()
+        binance_client.subscribe_symbol(symbol, timeframe=timeframe)
+
+        return jsonify({
+            "message": "Position tracked and WebSocket subscribed successfully",
+            "position_id": new_position.id
+        }), 201
 
     except Exception as e:
         db.session.rollback()
@@ -128,6 +138,7 @@ def price_history():
     """
     ตัวอย่าง: /api/price-history?symbol=DOGEUSDT&limit=50&timeframe=1m
     """
+    print(f"[DEBUG] 🧪 เช็ค chart: ")
     try:
         symbol = request.args.get("symbol")
         limit = int(request.args.get("limit", 50))

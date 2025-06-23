@@ -168,6 +168,7 @@ def init_websocket(socketio):
 
 def broadcast_price_update(socketio, symbol, price_data):
     """Broadcast price and candle update to subscribed clients"""
+    print(f"Broadcasting price update for {symbol}: {price_data}")
     try:
         # --- ส่งราคาปัจจุบัน ---
         price_message = {
@@ -200,7 +201,8 @@ def broadcast_price_update(socketio, symbol, price_data):
                 'high': price_data.get('high'),
                 'low': price_data.get('low'),
                 'close': price_data.get('close'),
-                'timestamp': ts
+                'timestamp': ts,
+                'timeframe': price_data.get('timeframe'),
             }
         }
         socketio.emit('candle_update', candle_message, room=f"symbol_{symbol}")

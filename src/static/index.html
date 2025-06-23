@@ -1088,11 +1088,15 @@
             
             socket.on('candle_update', function(data) {
                 // console.log('Candle update received:', data);
-                const symbol = data.data.symbol.replace('/', '');
-                if (charts[symbol]) {
-                    const chart = charts[symbol];
+                const symbolPlain = data.data.symbol.replace('/', '');
+                const timeframe = data.data.timeframe; // ดึง timeframe จากข้อมูลที่ได้รับมา
+                const chartKey = `${symbolPlain}-${timeframe}`; // สร้าง Key ที่ถูกต้อง
+                console.log('Candle update for:', chartKey);
+                if (charts[chartKey]) { // ตอนนี้จะหากราฟที่ถูกต้องได้แล้ว
+                    const chart = charts[chartKey];
                     if (chart._candleSeries) {
-                        if (!candleData[symbol]) candleData[symbol] = [];
+                        // ใช้ chartKey ในการเข้าถึง candleData ด้วย
+                        if (!candleData[chartKey]) candleData[chartKey] = [];
                         const ts = Number(data.data.timestamp);
                         const open = data.data.open;
                         const high = data.data.high;
@@ -1118,20 +1122,20 @@
                             close: close
                         };
 
-                        const lastCandle = candleData[symbol][candleData[symbol].length - 1];
+                        const lastCandle = candleData[chartKey][candleData[chartKey].length - 1]; // ใช้ chartKey ตรงนี้
                         if (lastCandle && lastCandle.time === newCandle.time) {
                             // อัปเดตแท่งล่าสุด
-                            candleData[symbol][candleData[symbol].length - 1] = newCandle;
+                            candleData[chartKey][candleData[chartKey].length - 1] = newCandle; // ใช้ chartKey ตรงนี้
                             chart._candleSeries.update(newCandle);
                         } else {
                             // เพิ่มแท่งใหม่
-                            candleData[symbol].push(newCandle);
-                            if (candleData[symbol].length > 200) {
-                                candleData[symbol].shift();
+                            candleData[chartKey].push(newCandle); // ใช้ chartKey ตรงนี้
+                            if (candleData[chartKey].length > 200) { // ใช้ chartKey ตรงนี้เพื่อจัดการขนาดข้อมูล
+                                candleData[chartKey].shift(); // ลบข้อมูลที่เก่าที่สุดออก
                             }
                             chart._candleSeries.update(newCandle);
                         }
-                        chart.timeScale().scrollToRealTime();
+                        chart.timeScale().scrollToRealTime(); // เลื่อนกราฟไปที่แท่งปัจจุบัน
                     }
                 }
             });

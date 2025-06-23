@@ -14,6 +14,9 @@ from src.websocket.websocket_server import broadcast_price_update
 
 logger = logging.getLogger(__name__)
 
+def normalize_symbol(symbol: str) -> str:
+    return symbol.replace("/", "").upper()
+
 class BinanceWebSocketClient:
     """Binance WebSocket client for real-time price streaming"""
     
@@ -26,9 +29,11 @@ class BinanceWebSocketClient:
         self.reconnect_attempts = 0
         self.max_reconnect_attempts = 5
         self.reconnect_delay = 5
-        
+        self.symbol_timeframes = {}  # <<== เพิ่มบรรทัดนี้
+
         # Binance WebSocket URL
         self.base_url = "wss://stream.binance.com:9443/ws/"
+
         
     def connect(self):
         """Connect to Binance WebSocket"""
@@ -78,50 +83,54 @@ class BinanceWebSocketClient:
         """Handle incoming WebSocket messages"""
         try:
             data = json.loads(message)
-            
-            # Handle ticker data
+
+            # ตรวจสอบว่าเป็นอีเวนต์ ticker
             if 'e' in data and data['e'] == '24hrTicker':
-                symbol = data['s']  # Symbol (e.g., BTCUSDT)
-                price = float(data['c'])  # Current price
-                change_24h = float(data['P'])  # 24h price change percentage
-                volume = float(data['v'])  # 24h volume
-                
+                raw_symbol = data['s']  # เช่น BTCUSDT
+                normalized_symbol = normalize_symbol(raw_symbol)  # เช่น BTCUSDT (กรณีมี /)
+
+                price = float(data['c'])  # Last price
+                change_24h = float(data['P'])  # 24h เปลี่ยนแปลงเป็น %
+                volume = float(data['v'])  # ปริมาณ 24h
+
                 price_data = {
-                    'symbol': symbol,
+                    'symbol': normalized_symbol,
                     'price': price,
                     'change_24h': change_24h,
                     'volume': volume,
                     'timestamp': datetime.now().isoformat(),
                     'source': 'binance_ws'
                 }
-                
-                # Call registered callbacks
-                if symbol in self.price_callbacks:
-                    for callback in self.price_callbacks[symbol]:
+
+                # 🔁 เรียก callback ถ้ามี
+                if normalized_symbol in self.price_callbacks:
+                    for callback in self.price_callbacks[normalized_symbol]:
                         try:
                             callback(price_data)
                         except Exception as e:
-                            logger.error(f"Error in price callback for {symbol}: {e}")
-                
-                # Broadcast via SocketIO
+                            logger.error(f"Error in price callback for {normalized_symbol}: {e}")
+
+                # ✅ ส่งผ่าน SocketIO
                 if self.socketio:
-                    # ส่งราคาปัจจุบัน
+                    # ราคา
                     self.socketio.emit('price_update', {
                         'type': 'price_update',
                         'data': price_data
-                    }, room=f"symbol_{symbol}")
+                    }, room=f"symbol_{normalized_symbol}")
 
-                    # ส่งแท่งเทียน
-                    candle_data = get_latest_candle(symbol, timeframe="1m")
+                    # กราฟแท่งเทียน
+                    timeframe = self.symbol_timeframes.get(normalized_symbol, "1m")
+                    candle_data = get_latest_candle(normalized_symbol, timeframe)
                     self.socketio.emit('candle_update', {
                         'type': 'candle_update',
                         'data': candle_data
-                    }, room=f"symbol_{symbol}")
-                
-                logger.debug(f"Price update: {symbol} = {price}")
-                
+                    }, room=f"symbol_{normalized_symbol}")
+
+                logger.debug(f"Price update: {normalized_symbol} = {price}")
+
         except Exception as e:
             logger.error(f"Error processing WebSocket message: {e}")
+
     
     def _on_error(self, ws, error):
         """Handle WebSocket errors"""
@@ -169,39 +178,45 @@ class BinanceWebSocketClient:
         else:
             logger.error("Max reconnection attempts reached")
     
-    def subscribe_symbol(self, symbol: str, callback: Optional[Callable] = None):
-        """Subscribe to price updates for a symbol"""
-        symbol_upper = symbol.upper()
-        self.subscribed_symbols.add(symbol_upper)
+        # เพิ่ม self.symbol_timeframes ใน __init__
+            # self.symbol_timeframes = {}  # symbol -> timeframe
+    
+    def subscribe_symbol(self, symbol: str, timeframe: Optional[str] = "1m", callback: Optional[Callable] = None):
         
+        symbol_key = normalize_symbol(symbol)
+        self.subscribed_symbols.add(symbol_key)
+        self.symbol_timeframes[symbol_key] = timeframe
+
+        # print(f"[DEBUG] subscribe_symbol called for {symbol_upper} with timeframe {timeframe}")
+
         if callback:
-            if symbol_upper not in self.price_callbacks:
-                self.price_callbacks[symbol_upper] = []
-            self.price_callbacks[symbol_upper].append(callback)
-        
-        logger.info(f"Subscribed to {symbol_upper}")
-        
-        # Reconnect with new subscription if already connected
+            if symbol_key not in self.price_callbacks:
+                self.price_callbacks[symbol_key] = []
+            self.price_callbacks[symbol_key].append(callback)
+
+        logger.info(f"Subscribed to {symbol_key} with timeframe {timeframe}")
+
+        # Reconnect with new subscription
         if self.is_connected:
             self.disconnect()
             time.sleep(1)
             self.connect()
+
     
     def unsubscribe_symbol(self, symbol: str):
-        """Unsubscribe from price updates for a symbol"""
         symbol_upper = symbol.upper()
         self.subscribed_symbols.discard(symbol_upper)
         
-        if symbol_upper in self.price_callbacks:
-            del self.price_callbacks[symbol_upper]
+        self.price_callbacks.pop(symbol_upper, None)
+        self.symbol_timeframes.pop(symbol_upper, None)  # ลบ timeframe ด้วย
         
         logger.info(f"Unsubscribed from {symbol_upper}")
         
-        # Reconnect with updated subscriptions if already connected
         if self.is_connected:
             self.disconnect()
             time.sleep(1)
             self.connect()
+
     
     def disconnect(self):
         """Disconnect from WebSocket"""
@@ -233,7 +248,7 @@ if __name__ == "__main__":
     from src.websocket.websocket_server import broadcast_price_update
     print("✅ Import OK")
 
-def get_latest_candle(symbol, timeframe="1m"):
+def get_latest_candle(symbol, timeframe):
     exchange = ccxt.binance()
     # Binance ใช้รูปแบบ BTC/USDT
     if not "/" in symbol:
@@ -248,5 +263,6 @@ def get_latest_candle(symbol, timeframe="1m"):
         'high': high,
         'low': low,
         'close': close,
-        'timestamp': int(ts // 1000)
+        'timestamp': int(ts // 1000),
+        'timeframe': timeframe,
     }
