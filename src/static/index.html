@@ -506,10 +506,9 @@
             event.target.classList.add('active');
 
             // Load data for specific tabs
-            // if (tabName === 'positions') {
-            //     // loadPositions();
-            // } else 
-            if (tabName === 'alerts') {
+            if (tabName === 'positions') {
+                // loadPositions();
+            } else if (tabName === 'alerts') {
                 loadAlerts();
                 // Clear unread count when viewing alerts
                 unreadAlertCount = 0;
@@ -589,7 +588,7 @@
             try {
                 const response = await fetch('/api/positions');
                 positions = await response.json();
-
+                console.log('Positions loaded:', positions);
                 const positionsList = document.getElementById('positionsList');
                 
                 if (positions.length === 0) {
@@ -610,7 +609,7 @@
                     return `
                     <div class="position-card mb-4" id="position-card-${pos.id}">
                         <div class="row g-0 align-items-center">
-                            <div class="col-md-6 col-12">
+                            <div class="col-md-12 col-12">
                                 <div class="position-header d-flex align-items-center mb-2">
                                     <h4 class="mb-0">${pos.symbol} (${pos.timeframe})</h4>&nbsp;
                                     <span class="position-type ${pos.position_type.toLowerCase()}">${pos.position_type}</span>
@@ -634,11 +633,11 @@
                                 <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
                                 <button class="btn btn-danger btn-sm mb-2" onclick="deletePosition(${pos.id})">🗑️ ลบ Position นี้</button>
                             </div>
-                            <div class="col-md-6 col-12 d-flex align-items-center justify-content-center">
+                            <!--<div class="col-md-6 col-12 d-flex align-items-center justify-content-center">
                                 <div class="w-100">
                                     <div id="${chartId}" class="w-100" style="max-width:100%; min-width:180px; min-height:180px; height:220px;"></div>
                                 </div>
-                            </div>
+                            </div>-->
                         </div>
                     </div>
                     `;

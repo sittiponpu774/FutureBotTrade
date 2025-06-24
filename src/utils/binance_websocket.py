@@ -9,10 +9,12 @@ import time
 import logging
 from typing import Dict, Callable, Optional
 from datetime import datetime
-from src.websocket.websocket_server import broadcast_price_update
+
 
 
 logger = logging.getLogger(__name__)
+
+
 
 def normalize_symbol(symbol: str) -> str:
     return symbol.replace("/", "").upper()
@@ -81,12 +83,14 @@ class BinanceWebSocketClient:
     
     def _on_message(self, ws, message):
         """Handle incoming WebSocket messages"""
+        from src.websocket.websocket_server import broadcast_price_update
         try:
             data = json.loads(message)
 
             # ตรวจสอบว่าเป็นอีเวนต์ ticker
             if 'e' in data and data['e'] == '24hrTicker':
                 raw_symbol = data['s']  # เช่น BTCUSDT
+                # print(f"[DEBUG] Received ticker data for {raw_symbol}: {data}")
                 normalized_symbol = normalize_symbol(raw_symbol)  # เช่น BTCUSDT (กรณีมี /)
 
                 price = float(data['c'])  # Last price
@@ -112,19 +116,17 @@ class BinanceWebSocketClient:
 
                 # ✅ ส่งผ่าน SocketIO
                 if self.socketio:
-                    # ราคา
-                    self.socketio.emit('price_update', {
-                        'type': 'price_update',
-                        'data': price_data
-                    }, room=f"symbol_{normalized_symbol}")
-
-                    # กราฟแท่งเทียน
                     timeframe = self.symbol_timeframes.get(normalized_symbol, "1m")
                     candle_data = get_latest_candle(normalized_symbol, timeframe)
-                    self.socketio.emit('candle_update', {
-                        'type': 'candle_update',
-                        'data': candle_data
-                    }, room=f"symbol_{normalized_symbol}")
+                    # print(f"[DEBUG] Broadcasting price update for {normalized_symbol} with timeframe {timeframe}")
+                    broadcast_price_update(self.socketio, normalized_symbol, {
+                        **price_data,
+                        'open': candle_data['open'],
+                        'high': candle_data['high'],
+                        'low': candle_data['low'],
+                        'close': candle_data['close'],
+                        'timeframe': timeframe,
+                    })
 
                 logger.debug(f"Price update: {normalized_symbol} = {price}")
 
@@ -182,12 +184,10 @@ class BinanceWebSocketClient:
             # self.symbol_timeframes = {}  # symbol -> timeframe
     
     def subscribe_symbol(self, symbol: str, timeframe: Optional[str] = "1m", callback: Optional[Callable] = None):
-        
         symbol_key = normalize_symbol(symbol)
         self.subscribed_symbols.add(symbol_key)
         self.symbol_timeframes[symbol_key] = timeframe
-
-        # print(f"[DEBUG] subscribe_symbol called for {symbol_upper} with timeframe {timeframe}")
+        # print(f"[DEBUG] subscribe_symbol called for {symbol_key} with timeframe {timeframe}")
 
         if callback:
             if symbol_key not in self.price_callbacks:
@@ -201,6 +201,7 @@ class BinanceWebSocketClient:
             self.disconnect()
             time.sleep(1)
             self.connect()
+
 
     
     def unsubscribe_symbol(self, symbol: str):
@@ -235,14 +236,16 @@ class BinanceWebSocketClient:
         }
 
 # Global instance
-binance_ws_client = None
+_binance_ws_client = None
 
 def get_binance_ws_client(socketio=None):
-    """Get or create Binance WebSocket client instance"""
-    global binance_ws_client
-    if binance_ws_client is None:
-        binance_ws_client = BinanceWebSocketClient(socketio)
-    return binance_ws_client
+    global _binance_ws_client
+    if _binance_ws_client is None:
+        if socketio is None:
+            raise RuntimeError("SocketIO is required to initialize BinanceWebSocketClient")
+        _binance_ws_client = BinanceWebSocketClient(socketio)
+    return _binance_ws_client
+
 
 if __name__ == "__main__":
     from src.websocket.websocket_server import broadcast_price_update

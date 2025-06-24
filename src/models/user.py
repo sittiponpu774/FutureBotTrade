@@ -1,6 +1,4 @@
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
+from src.app import db  # ✅ import db ที่ถูกต้อง จากที่ init แล้วเท่านั้น
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)

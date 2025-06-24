@@ -6,7 +6,8 @@ import asyncio
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from src.models.user import db
+from src.app import db, app
+from src.models.user import User
 from src.routes.user import user_bp
 from src.routes.predict import predict_bp
 from src.routes.trading import trading_bp
@@ -17,6 +18,7 @@ from src.websocket.websocket_server import init_websocket
 from src.utils.binance_websocket import get_binance_ws_client
 import threading
 from src.telegram_bot import build_bot
+
 
 # ไม่จำเป็นต้องมีฟังก์ชันนี้แล้ว เพราะเราจะใช้ asyncio.run ในเธรด
 # def run_telegram_bot():
@@ -62,7 +64,7 @@ def serve(path):
 
 def run_telegram_bot_background():
     try:
-        app = build_bot()
+        telegram_app = build_bot()  # ✅ ชื่อไม่ซ้ำกับ Flask app
         print("[DEBUG] เริ่ม Telegram Bot...")
 
         # 🔧 สร้าง event loop ใหม่ในเธรดนี้
@@ -70,12 +72,31 @@ def run_telegram_bot_background():
         asyncio.set_event_loop(loop)
 
         # 🔁 รัน bot แบบ async
-        loop.run_until_complete(app.run_polling())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(telegram_app.run_polling())  # ✅ ทำงานได้ถูกต้อง
 
     except Exception as e:
         print(f"[ERROR] Telegram Bot error: {e}")
-
         
+def subscribe_position(position):
+    try:
+        client = get_binance_ws_client()
+        client.subscribe_symbol(position.symbol, position.timeframe)
+    except Exception as e:
+        print(f"[ERROR] subscribe_position: {e}")
+
+# def subscribe_existing_positions():
+#     """ดึง Positions ที่เคย track แล้วมาสมัคร WebSocket อีกครั้ง"""
+#     try:
+#         client = get_binance_ws_client()
+#         positions = Position.query.all()
+#         for pos in positions:
+#             client.subscribe_symbol(pos.symbol, timeframe=pos.timeframe)
+#         print(f"[DEBUG] ✅ Subscribed {len(positions)} positions จาก DB แล้ว")
+#     except Exception as e:
+#         print(f"[ERROR] subscribe_existing_positions: {e}")
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -83,6 +104,7 @@ if __name__ == '__main__':
     init_websocket(socketio)
     binance_client = get_binance_ws_client(socketio)
     start_background_tasks(app, socketio)
+    # subscribe_existing_positions()  # 🟢 เรียกก่อนรันแอป
     binance_client.connect()
 
     common_symbols = ['BTCUSDT', 'ETHUSDT', 'DOGEUSDT', 'ADAUSDT', 'SOLUSDT']

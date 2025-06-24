@@ -1,9 +1,16 @@
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
-from src.models.user import db
+from src.app import db, app
+from src.models.user import User
+
 from src.models.trading import Position, Alert, SignalHistory
 from datetime import datetime
 import ccxt
+# from src.websocket.price_streaming import get_price_streaming_service
+from src.utils.binance_websocket import get_binance_ws_client
+
+
+
 
 trading_bp = Blueprint("trading", __name__)
 
@@ -12,7 +19,7 @@ trading_bp = Blueprint("trading", __name__)
 def track_position():
     try:
         data = request.get_json()
-        symbol = data.get("symbol")
+        symbol = data.get("symbol").replace("/", "").upper()
         timeframe = data.get("timeframe")
         position_type = data.get("position_type")
         entry_price = data.get("entry_price")
@@ -32,6 +39,7 @@ def track_position():
             profit_target=profit_target,
             loss_limit=loss_limit,
         )
+        print(f"[DEBUG] Creating position: {new_position}")
         db.session.add(new_position)
         db.session.commit()
 
@@ -173,24 +181,54 @@ def delete_position(position_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-def create_position(symbol, timeframe, position_type, entry_price, entry_time=None, profit_target=2.0, loss_limit=1.0, telegram_user=None):
-    """
-    ฟังก์ชันสร้าง Position สำหรับเรียกใช้จาก Telegram bot โดยตรง
-    """
+
+def create_position(symbol, timeframe, position_type, entry_price, entry_time=None, profit_target=2.0, loss_limit=1.0):
+    print(">>> [START] create_position called")
     try:
+        if not all([symbol, timeframe, position_type, entry_price, profit_target, loss_limit]):
+            print(">>> [ERROR] Missing data")
+            return {"success": False, "error": "Missing data for tracking position"}
+
+        print(">>> [STEP] Passed input validation")
+
+        entry_price = float(entry_price)
+        profit_target = float(profit_target)
+        loss_limit = float(loss_limit)
+
+        # ✅ แปลง entry_time ถ้ามาเป็น string
+        if entry_time and isinstance(entry_time, str):
+            entry_time = datetime.fromisoformat(entry_time)
+
         new_position = Position(
-            symbol=symbol,
+            symbol=symbol.replace("/", "").upper(),
             timeframe=timeframe,
             position_type=position_type,
             entry_price=entry_price,
             entry_time=entry_time or datetime.utcnow(),
             profit_target=profit_target,
-            loss_limit=loss_limit,
-            telegram_user=telegram_user
+            loss_limit=loss_limit
         )
+        print(">>> [STEP] Created Position object")
+
         db.session.add(new_position)
+        print(">>> [STEP] Added to DB session")
+
         db.session.commit()
+        print(">>> [STEP] DB committed")
+
+        try:
+            client = get_binance_ws_client()
+            client.subscribe_symbol(new_position.symbol, new_position.timeframe)
+            print(f"[WS] Subscribed to {new_position.symbol} {new_position.timeframe}")
+        except Exception as e:
+            print(f"[WS ERROR] Failed to subscribe symbol: {e}")
+
         return {"success": True, "position_id": new_position.id}
+
     except Exception as e:
         db.session.rollback()
+        print(f"[DB ERROR] Failed to save position: {e}")
         return {"success": False, "error": str(e)}
+
+    
+

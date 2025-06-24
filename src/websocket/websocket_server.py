@@ -2,6 +2,9 @@ from flask_socketio import emit, join_room, leave_room
 from flask import request
 import logging
 from datetime import datetime
+# from src.utils.binance_websocket import get_binance_ws_client, BinanceWebSocketClient
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +171,7 @@ def init_websocket(socketio):
 
 def broadcast_price_update(socketio, symbol, price_data):
     """Broadcast price and candle update to subscribed clients"""
-    print(f"Broadcasting price update for {symbol}: {price_data}")
+    # print(f"Broadcasting price update for {symbol}: {price_data}")
     try:
         # --- ส่งราคาปัจจุบัน ---
         price_message = {
@@ -205,6 +208,7 @@ def broadcast_price_update(socketio, symbol, price_data):
                 'timeframe': price_data.get('timeframe'),
             }
         }
+        # print(f"Broadcasting candle update for {symbol}: {candle_message}")
         socketio.emit('candle_update', candle_message, room=f"symbol_{symbol}")
 
         logger.debug(f"Broadcasted price and candle update for {symbol}")
@@ -262,3 +266,6 @@ def get_symbol_subscriptions():
     """Get current symbol subscriptions"""
     return {symbol: len(clients) for symbol, clients in symbol_subscriptions.items()}
 
+# 👇 เพิ่มไว้ด้านล่างสุดของ websocket_server.py หรือจุดเหมาะสม
+
+_binance_ws_client = None

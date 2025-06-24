@@ -11,6 +11,11 @@ from dotenv import load_dotenv
 import os
 from src.routes.predict import predict_coin
 from src.routes.trading import create_position
+# telegram_bot.py
+from src.app import app as flask_app  # ✅ แยกชื่อให้ชัดเจน
+from src.models.user import User
+
+
 
 ASK_POSITION, ASK_POSITION_DETAILS = range(2)
 
@@ -26,7 +31,11 @@ def build_bot():
         parts = text.split()
         if len(parts) != 2:
             await update.message.reply_text("กรุณาพิมพ์ในรูปแบบ: symbol timeframe เช่น btc/usdt 1h")
-            return ASK_POSITION  # อยู่ใน state รอ input ใหม่
+            return ASK_POSITION  # รอ input ใหม่
+        
+        await update.message.reply_text(
+                "ระบบกำลังประมวลผลข้อมูล กรุณารอสักครู่..."
+            )
 
         symbol, timeframe = parts
         result = predict_coin(symbol, timeframe)
@@ -38,7 +47,8 @@ def build_bot():
         )
         context.user_data['predict_result'] = result
         await update.message.reply_text(msg)
-        return ASK_POSITION_DETAILS
+        return ASK_POSITION  # ✅ ต้องใช้ state นี้ เพื่อให้ handle_create_position ทำงาน
+
 
     async def handle_create_position(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("[DEBUG] ✳️ handle_create_position ถูกเรียก")
@@ -67,31 +77,49 @@ def build_bot():
             return ASK_POSITION_DETAILS
 
         result = context.user_data['predict_result']
-        create_position(
-            symbol=result['symbol'],
-            timeframe=result['timeframe'],
-            position_type=result['recommendation'],
-            entry_price=entry_price,
-            entry_time=result['predict_time'],
-            profit_target=profit_target,
-            loss_limit=loss_limit,
-            telegram_user=update.effective_user.username
-        )
-        await update.message.reply_text("✅ สร้าง position สำเร็จ!")
+        if not result:
+            await update.message.reply_text("❌ ไม่พบข้อมูลการทำนายก่อนหน้า กรุณาพิมพ์ใหม่อีกครั้ง เช่น btc/usdt 1h")
+            return ConversationHandler.END
+        
+        try:
+            with flask_app.app_context():
+                create_position(
+                    symbol=result['symbol'],
+                    timeframe=result['timeframe'],
+                    position_type=result['recommendation'],
+                    entry_price=entry_price,
+                    entry_time=result['predict_time'],
+                    profit_target=profit_target,
+                    loss_limit=loss_limit
+                    # telegram_user=update.effective_user.username
+                )
+                print(f"[BOT DEBUG] Result: {result}")
+            await update.message.reply_text("✅ สร้าง position สำเร็จ!")
+        except Exception as e:
+            print(f"[ERROR] {e}")
+            await update.message.reply_text("❌ เกิดข้อผิดพลาดระหว่างการสร้าง position")
+
         return ConversationHandler.END
 
-    app = ApplicationBuilder().token(token).build()
-    app.add_handler(CommandHandler('start', start))
+    telegram_app = ApplicationBuilder().token(token).build()
+    telegram_app.add_handler(CommandHandler('start', start))
 
     conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_predict)],
+        entry_points=[
+            MessageHandler(filters.Regex(r'^[a-z]+/[a-z]+\s+\d+[mhd]$'), handle_predict)
+        ],
         states={
-            ASK_POSITION: [MessageHandler(filters.Regex('^(y|n|Y|N)$'), handle_create_position)],
-            ASK_POSITION_DETAILS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_position_details)],
+            ASK_POSITION: [
+                MessageHandler(filters.Regex('^(y|n|Y|N)$'), handle_create_position)
+            ],
+            ASK_POSITION_DETAILS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_position_details)
+            ],
         },
         fallbacks=[CommandHandler('start', start)],
         allow_reentry=True,
     )
-    app.add_handler(conv_handler)
 
-    return app
+    telegram_app.add_handler(conv_handler)
+
+    return telegram_app 

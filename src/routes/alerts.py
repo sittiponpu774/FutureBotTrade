@@ -1,7 +1,9 @@
 import os
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
-from src.models.user import db
+from src.app import db, app
+from src.models.user import User
+
 from src.models.trading import Alert
 from datetime import datetime
 from dotenv import load_dotenv
