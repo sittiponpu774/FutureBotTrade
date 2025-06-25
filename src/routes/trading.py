@@ -174,15 +174,23 @@ def delete_position(position_id):
         pos = Position.query.get(position_id)
         if not pos:
             return jsonify({"error": "ไม่พบ Position นี้"}), 404
+
+        # 🔥 ลบ Alerts ที่เกี่ยวข้องก่อน
+        Alert.query.filter_by(position_id=position_id).delete(synchronize_session=False)
+        
+
+        # ✅ ลบ Position
         db.session.delete(pos)
         db.session.commit()
+
         return jsonify({"success": True, "message": f"ลบ Position {position_id} เรียบร้อยแล้ว"}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 
-def create_position(symbol, timeframe, position_type, entry_price, entry_time=None, profit_target=2.0, loss_limit=1.0):
+
+def create_position(symbol, timeframe, position_type, entry_price, entry_time=None, profit_target=2.0, loss_limit=1.0,socketio=None):
     print(">>> [START] create_position called")
     try:
         if not all([symbol, timeframe, position_type, entry_price, profit_target, loss_limit]):
@@ -215,6 +223,24 @@ def create_position(symbol, timeframe, position_type, entry_price, entry_time=No
 
         db.session.commit()
         print(">>> [STEP] DB committed")
+
+         # ✅ Broadcast ไปยัง WebSocket
+        from src.websocket.websocket_server import broadcast_position_update
+        if socketio:
+            broadcast_position_update(socketio, {
+                'position_id': new_position.id,
+                'symbol': new_position.symbol,
+                'direction': new_position.position_type,
+                'entry_price': float(new_position.entry_price),
+                'current_price': float(new_position.current_price) if new_position.current_price else float(new_position.entry_price),
+                # 'quantity': float(new_position.quantity),
+                'profit_target': float(new_position.profit_target),
+                'stop_loss': float(new_position.loss_limit),
+                'pnl': 0.0,
+                'pnl_percentage': 0.0,
+                'created_at': new_position.created_at.isoformat(),
+                'status': new_position.status,
+            })
 
         try:
             client = get_binance_ws_client()

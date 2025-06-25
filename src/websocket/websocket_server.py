@@ -6,6 +6,8 @@ from datetime import datetime
 
 
 
+
+
 logger = logging.getLogger(__name__)
 
 # Store connected clients and their subscriptions
@@ -265,6 +267,36 @@ def get_connected_clients_count():
 def get_symbol_subscriptions():
     """Get current symbol subscriptions"""
     return {symbol: len(clients) for symbol, clients in symbol_subscriptions.items()}
+
+
+def broadcast_clear_all(socketio):
+    """Broadcast event that all positions were cleared"""
+    try:
+        message = {
+            'type': 'clear_all',
+            'data': {
+                'message': 'All positions cleared'
+            }
+        }
+        socketio.emit('clear_all', message)
+        logger.info("Broadcasted clear_all to all clients")
+    except Exception as e:
+        logger.error(f"Error broadcasting clear_all: {str(e)}")
+
+def broadcast_clearalert_all(socketio):
+    """Broadcast event that all positions were cleared"""
+    try:
+        message = {
+            'type': 'clear_all',
+            'data': {
+                'message': 'All positions cleared'
+            }
+        }
+        socketio.emit('clear_alert_all', message)
+        logger.info("Broadcasted clear_all to all clients")
+    except Exception as e:
+        logger.error(f"Error broadcasting clear_all: {str(e)}")
+
 
 # 👇 เพิ่มไว้ด้านล่างสุดของ websocket_server.py หรือจุดเหมาะสม
 

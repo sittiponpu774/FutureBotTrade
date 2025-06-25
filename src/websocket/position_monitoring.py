@@ -87,7 +87,7 @@ class PositionMonitoringService:
                 
             except Exception as e:
                 logger.error(f"Error in position monitoring loop: {str(e)}")
-                time.sleep(10)  # Wait longer on error
+                time.sleep(1)  # Wait longer on error
                 
     def _get_current_price(self, symbol):
         """Get current price for symbol (placeholder)"""

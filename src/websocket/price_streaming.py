@@ -59,7 +59,7 @@ class PriceStreamingService:
                 
             except Exception as e:
                 logger.error(f"Error in price streaming loop: {str(e)}")
-                time.sleep(5)  # Wait longer on error
+                time.sleep(1)  # Wait longer on error
     
     def _get_active_symbols(self):
         try:

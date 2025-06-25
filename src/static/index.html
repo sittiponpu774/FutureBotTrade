@@ -507,7 +507,7 @@
 
             // Load data for specific tabs
             if (tabName === 'positions') {
-                // loadPositions();
+                loadPositions();
             } else if (tabName === 'alerts') {
                 loadAlerts();
                 // Clear unread count when viewing alerts
@@ -588,7 +588,7 @@
             try {
                 const response = await fetch('/api/positions');
                 positions = await response.json();
-                console.log('Positions loaded:', positions);
+                // console.log('Positions loaded:', positions);
                 const positionsList = document.getElementById('positionsList');
                 
                 if (positions.length === 0) {
@@ -607,37 +607,39 @@
                     const chartId = `chart-${symbolPlain}-${tf}`;
                    
                     return `
-                    <div class="position-card mb-4" id="position-card-${pos.id}">
-                        <div class="row g-0 align-items-center">
-                            <div class="col-md-12 col-12">
-                                <div class="position-header d-flex align-items-center mb-2">
-                                    <h4 class="mb-0">${pos.symbol} (${pos.timeframe})</h4>&nbsp;
-                                    <span class="position-type ${pos.position_type.toLowerCase()}">${pos.position_type}</span>
+                    <div id="positions-container">
+                        <div class="position-card mb-4" id="position-card-${pos.id}">
+                            <div class="row g-0 align-items-center">
+                                <div class="col-md-12 col-12">
+                                    <div class="position-header d-flex align-items-center mb-2">
+                                        <h4 class="mb-0">${pos.symbol} (${pos.timeframe})</h4>&nbsp;
+                                        <span class="position-type ${pos.position_type.toLowerCase()}">${pos.position_type}</span>
+                                    </div>
+                                    <!-- เพิ่มปุ่มลบตรงนี้ -->
+                                
+                                    <p>📅 เวลาเข้า: ${new Date(pos.entry_time).toLocaleString('th-TH')}</p>
+                                    <p>💰 ราคาเข้า: ${pos.entry_price} USDT</p>
+                                    <p>📈 ราคาปัจจุบัน: 
+                                        <span id="price-${symbolPlain}" class="real-time-price">${pos.current_price || 'N/A'}</span> USDT
+                                        <span id="change-${symbolPlain}" class="change-24h ${priceChange24h >= 0 ? 'positive' : 'negative'}">
+                                        ${changeSymbol} ${priceChange24h.toFixed(2)}%
+                                        </span>
+                                    </p>
+                                    <p>📊 กำไร/ขาดทุน: 
+                                        <span id="pnl-${symbolPlain}" class="pnl ${currentPnl >= 0 ? 'positive' : 'negative'}">
+                                        ${changeSymbolPnl} ${currentPnl ? currentPnl.toFixed(2) : '0.00'}%
+                                        </span>
+                                    </p>
+                                    <p>🎯 เป้าหมายกำไร: ${pos.profit_target}%</p>
+                                    <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
+                                    <button class="btn btn-danger btn-sm mb-2" onclick="deletePosition(${pos.id})">🗑️ ลบ Position นี้</button>
                                 </div>
-                                <!-- เพิ่มปุ่มลบตรงนี้ -->
-                              
-                                <p>📅 เวลาเข้า: ${new Date(pos.entry_time).toLocaleString('th-TH')}</p>
-                                <p>💰 ราคาเข้า: ${pos.entry_price} USDT</p>
-                                <p>📈 ราคาปัจจุบัน: 
-                                    <span id="price-${symbolPlain}" class="real-time-price">${pos.current_price || 'N/A'}</span> USDT
-                                    <span id="change-${symbolPlain}" class="change-24h ${priceChange24h >= 0 ? 'positive' : 'negative'}">
-                                    ${changeSymbol} ${priceChange24h.toFixed(2)}%
-                                    </span>
-                                </p>
-                                <p>📊 กำไร/ขาดทุน: 
-                                    <span id="pnl-${symbolPlain}" class="pnl ${currentPnl >= 0 ? 'positive' : 'negative'}">
-                                    ${changeSymbolPnl} ${currentPnl ? currentPnl.toFixed(2) : '0.00'}%
-                                    </span>
-                                </p>
-                                <p>🎯 เป้าหมายกำไร: ${pos.profit_target}%</p>
-                                <p>🛑 ขีดจำกัดขาดทุน: ${pos.loss_limit}%</p>
-                                <button class="btn btn-danger btn-sm mb-2" onclick="deletePosition(${pos.id})">🗑️ ลบ Position นี้</button>
+                                <!--<div class="col-md-6 col-12 d-flex align-items-center justify-content-center">
+                                    <div class="w-100">
+                                        <div id="${chartId}" class="w-100" style="max-width:100%; min-width:180px; min-height:180px; height:220px;"></div>
+                                    </div>
+                                </div>-->
                             </div>
-                            <!--<div class="col-md-6 col-12 d-flex align-items-center justify-content-center">
-                                <div class="w-100">
-                                    <div id="${chartId}" class="w-100" style="max-width:100%; min-width:180px; min-height:180px; height:220px;"></div>
-                                </div>
-                            </div>-->
                         </div>
                     </div>
                     `;
@@ -1136,11 +1138,30 @@
             });
 
             socket.on('position_update', function(data) {
-                updatePositionDisplay(data.data);
+
+                // console.log('[WS] position_update received:', data);
+
+                // ✅ โหลดใหม่ทั้ง positions
+                loadPositions();
+
+                // ✅ หรือจะ update แบบ inline ก็ได้
+                updatePositionDisplay(data.data); 
             });
 
             // ...ในฟังก์ชัน initWebSocket() เพิ่ม listener นี้...
+            socket.on('clear_all', function(data) {
+                const container = document.getElementById('positionsList');
+                if (container) {
+                    container.innerHTML = '<p>📭 ไม่มีตำแหน่งที่กำลังติดตาม</p>';
+                }
+            })
 
+            socket.on('clear_alert_all', function(data) {
+                const container = document.getElementById('alertsList');
+                if (container) {
+                    container.innerHTML = '<p>📭 ไม่มีตำแหน่งที่กำลังติดตาม</p>';
+                }
+            })
 
             socket.on('alert', function(data) {
                 showRealtimeAlert(data.data);
@@ -1341,6 +1362,7 @@
             });
         }
 
+
         function showRealtimeAlert(alertData) {
             // Create floating alert notification
             const alertDiv = document.createElement('div');
@@ -1454,6 +1476,10 @@
             const savedSymbols = JSON.parse(localStorage.getItem('subscribedSymbols') || '[]');
             savedSymbols.forEach(symbol => {
                 subscribeToSymbol(symbol);  // จะทำให้ socket.emit ถูกยิงหลัง connect
+            });
+
+            socket.on('position_update', function(data) {
+                updatePositionDisplay(data.data);
             });
         });
 

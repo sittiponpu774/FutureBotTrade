@@ -14,17 +14,44 @@ from src.routes.trading import create_position
 # telegram_bot.py
 from src.app import app as flask_app  # ✅ แยกชื่อให้ชัดเจน
 from src.models.user import User
-
+from sqlalchemy.exc import SQLAlchemyError
+from src.websocket.websocket_server import broadcast_clear_all,broadcast_clearalert_all
+from src.models.trading import Position, Alert, SignalHistory
+from src.app import db
 
 
 ASK_POSITION, ASK_POSITION_DETAILS = range(2)
 
-def build_bot():
+def build_bot(socketio):
     load_dotenv()
     token = os.getenv("TELEGRAM_BOT_TOKEN")
 
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("พิมพ์ชื่อเหรียญ เช่น btc/usdt 1h เพื่อทำนายราคา")
+    
+    async def handle_clear_positions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            with flask_app.app_context():
+                deleted = Position.query.delete()
+                db.session.commit()  # หรือ db.session.commit() ถ้า import ไว้แล้ว
+                broadcast_clear_all(socketio) 
+
+            await update.message.reply_text(f"🧹 ลบตำแหน่งทั้งหมด ({deleted} รายการ) สำเร็จแล้ว")
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            await update.message.reply_text(f"❌ ลบไม่สำเร็จ: {str(e)}")
+    
+    async def handle_clear_alert(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            with flask_app.app_context():
+                deleted = Alert.query.delete()
+                db.session.commit()  # หรือ db.session.commit() ถ้า import ไว้แล้ว
+                broadcast_clearalert_all(socketio) 
+
+            await update.message.reply_text(f"🧹 ลบตำแหน่งทั้งหมด ({deleted} รายการ) สำเร็จแล้ว")
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            await update.message.reply_text(f"❌ ลบไม่สำเร็จ: {str(e)}")
 
     async def handle_predict(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip().lower()
@@ -90,10 +117,11 @@ def build_bot():
                     entry_price=entry_price,
                     entry_time=result['predict_time'],
                     profit_target=profit_target,
-                    loss_limit=loss_limit
+                    loss_limit=loss_limit,
+                    socketio=socketio
                     # telegram_user=update.effective_user.username
                 )
-                print(f"[BOT DEBUG] Result: {result}")
+                # print(f"[BOT DEBUG] Result: {result}")
             await update.message.reply_text("✅ สร้าง position สำเร็จ!")
         except Exception as e:
             print(f"[ERROR] {e}")
@@ -114,12 +142,20 @@ def build_bot():
             ],
             ASK_POSITION_DETAILS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_position_details)
-            ],
+            ]
         },
         fallbacks=[CommandHandler('start', start)],
         allow_reentry=True,
     )
 
     telegram_app.add_handler(conv_handler)
+    # ✅ Handler สำหรับพิมพ์ "clear"
+    telegram_app.add_handler(
+        MessageHandler(filters.Regex(r'(?i)^clear$'), handle_clear_positions)
+    )
+
+    telegram_app.add_handler(
+        MessageHandler(filters.Regex(r'(?i)^clearalert$'), handle_clear_alert)
+    )
 
     return telegram_app 

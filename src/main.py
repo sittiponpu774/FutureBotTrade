@@ -64,7 +64,7 @@ def serve(path):
 
 def run_telegram_bot_background():
     try:
-        telegram_app = build_bot()  # ✅ ชื่อไม่ซ้ำกับ Flask app
+        telegram_app = build_bot(socketio)  # ✅ ชื่อไม่ซ้ำกับ Flask app
         print("[DEBUG] เริ่ม Telegram Bot...")
 
         # 🔧 สร้าง event loop ใหม่ในเธรดนี้
